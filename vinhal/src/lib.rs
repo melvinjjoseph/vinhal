@@ -31,21 +31,28 @@ fn compute_gradient(x: Vec<f64>, y: Vec<f64>, w: f64, b: f64) -> (f64, f64) {
 }
 
 #[pyfunction]
-fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, num_iters: u64, cost_function: fn(Vec<f64>, Vec<f64>, f64, f64) -> f64, gradient_function: fn(Vec<f64>, Vec<f64>, f64, f64) -> (f64, f64) {
-    let mut J_hist = vec![];
-    let mut p_hist = vec![];
+fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, num_iters: u64) -> (f64, f64, Vec<f64>, Vec<Vec<f64>>) {
+    let mut j_hist : Vec<f64> = vec![];
+    let mut p_hist : Vec<Vec<f64>> = vec![];
     let mut b = b_in;
     let mut w = w_in;
 
     for i in 0..num_iters {
-        let (dj_dw, dj_db) = gradient_function(x, y, w, b);
+        let (dj_dw, dj_db) = compute_gradient(x.clone(), y.clone(), w, b);
         b -= alpha * dj_db;
         w -= alpha * dj_dw;
+        
+        if i < 100000 {
+            j_hist.push(compute_cost(x.clone(), y.clone(), w, b));
+            p_hist.push(vec![w, b]);
+        }
 
-        // incomplete function
+        if i % (num_iters / 10) == 0 {
+            let j_hist_last = j_hist[j_hist.len() - 1];
+            println!("Iteration {i}: Cost {j_hist_last}  dj_dw: {dj_dw}  dj_db: {dj_db}  w: {w}  b: {b}");
+        }
     }
-}
-    }
+    (w, b, j_hist, p_hist)
 }
 /// Formats the sum of two numbers as string.
 // #[pyfunction]
@@ -58,5 +65,7 @@ fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, 
 fn vinhal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_cost, m)?)?;
     m.add_function(wrap_pyfunction!(compute_gradient, m)?)?;
+    m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
+//    m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
     Ok(())
 }
