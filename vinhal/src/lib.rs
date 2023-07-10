@@ -1,5 +1,31 @@
 use pyo3::prelude::*;
 
+#[pyclass]
+struct lr_obj {
+    #[pyo3(get, set)]
+    w: f64,
+    #[pyo3(get, set)]
+    b: f64,
+    #[pyo3(get, set)]
+    j_hist: Vec<f64>,
+    #[pyo3(get, set)]
+    p_hist: Vec<Vec<f64>>,
+}
+
+#[pymethods]
+impl lr_obj {
+    #[new]
+    #[args(w = "0.0", b = "0.0", j_hist = "vec![]", p_hist = "vec![]")]
+    fn new(w: f64, b: f64, j_hist: Vec<f64>, p_hist: Vec<Vec<f64>>) -> Self {
+        lr_obj { w, b, j_hist, p_hist }
+    }
+
+    #[args(x = "0.0")]
+    fn predict_x(&self, x: f64) -> f64 {
+        self.w * x + self.b
+    }
+}
+
 /// Linear Regression
 #[pyfunction]
 fn compute_cost(x: Vec<f64>, y: Vec<f64>, w: f64, b: f64) -> f64 {
@@ -31,7 +57,7 @@ fn compute_gradient(x: Vec<f64>, y: Vec<f64>, w: f64, b: f64) -> (f64, f64) {
 }
 
 #[pyfunction]
-fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, num_iters: u64) -> (f64, f64, Vec<f64>, Vec<Vec<f64>>) {
+fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, num_iters: u64) -> PyResult<lr_obj> {
     let mut j_hist : Vec<f64> = vec![];
     let mut p_hist : Vec<Vec<f64>> = vec![];
     let mut b = b_in;
@@ -52,8 +78,14 @@ fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, 
             println!("Iteration {i}: Cost {j_hist_last}  dj_dw: {dj_dw}  dj_db: {dj_db}  w: {w}  b: {b}");
         }
     }
-    (w, b, j_hist, p_hist)
+    Ok(lr_obj::new(w, b, j_hist, p_hist))
 }
+
+#[pyfunction]
+fn predict_single_value(x: Vec<f64>, w: Vec<f64>, b: f64) -> f64 {
+    w.iter().zip(x.iter()).fold(b, |acc, (&wi, &xi)| acc + wi * xi)
+}
+
 /// Formats the sum of two numbers as string.
 // #[pyfunction]
 // fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
@@ -66,6 +98,7 @@ fn vinhal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_cost, m)?)?;
     m.add_function(wrap_pyfunction!(compute_gradient, m)?)?;
     m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
+    m.add_function(wrap_pyfunction!(predict_single_value, m)?)?;
 //    m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
     Ok(())
 }
