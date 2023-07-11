@@ -12,6 +12,16 @@ struct lr_obj {
     p_hist: Vec<Vec<f64>>,
 }
 
+#[pyclass]
+struct Lrobj_multi {
+    #[pyo3(get, set)]
+    w: Vec<f64>,
+    #[pyo3(get, set)]
+    b: f64,
+    #[pyo3(get, set)]
+    j_hist: Vec<f64>
+}
+
 #[pymethods]
 impl lr_obj {
     #[new]
@@ -26,16 +36,23 @@ impl lr_obj {
     }
 }
 
+#[pymethods]
+impl Lrobj_multi {
+    #[new]
+    #[args(w = "vec![]", b = "0.0", j_hist = "vec![]")]
+    fn new(w: Vec<f64>, b: f64, j_hist: Vec<f64>) -> Self {
+        Lrobj_multi { w, b, j_hist }
+    }
+}
+
 /// Linear Regression
 #[pyfunction]
 fn compute_cost(x: Vec<f64>, y: Vec<f64>, w: f64, b: f64) -> f64 {
     let mut cost: f64 = 0.0;
-
     for i in 0..x.len() {
         let f_wb = w * x[i] + b;
         cost += (f_wb - y[i]).powi(2);
     }
-
     1.0 / (2.0 * x.len() as f64) * cost
 }
 
@@ -81,9 +98,62 @@ fn gradient_descent(x: Vec<f64>, y: Vec<f64>, w_in: f64, b_in: f64, alpha: f64, 
     Ok(lr_obj::new(w, b, j_hist, p_hist))
 }
 
+// Writing for Multi-variate Linear Regression
 #[pyfunction]
 fn predict_single_value(x: Vec<f64>, w: Vec<f64>, b: f64) -> f64 {
     w.iter().zip(x.iter()).fold(b, |acc, (&wi, &xi)| acc + wi * xi)
+}
+
+#[pyfunction]
+fn compute_cost_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64) -> f64 {
+//x.iter().zip(y.iter()).fold(0.0, |acc, (&ai, &bi)| acc + (predict_single_value(ai, w, b) - bi).powi(2)) / (2.0*x.len() as f64)
+    let mut cost : f64 = 0.0;
+    for (ai, bi) in x.iter().zip(y.iter()) {
+        let err = predict_single_value(ai.to_vec(), w.clone(), b) - bi;
+        let err_sq = err.powi(2);
+        cost += err_sq;
+    }
+    cost / (2.0 * x.len() as f64)
+}
+
+#[pyfunction]
+fn compute_gradient_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64) -> (Vec<f64>, f64) {
+    let mut dj_dw : Vec<f64> = vec![];
+    let mut dj_db : f64 = 0.0;
+    let m = x.len() as f64;
+    for (ai, bi) in x.iter().zip(y.iter()) {
+        let err = predict_single_value(ai.to_vec(), w.clone(), b) - bi;
+        for i in 0..x[0].len() {
+            dj_dw.push(err * ai[i]);
+            dj_db += err;
+        }
+        dj_dw = dj_dw.iter().map(|&x| x / m).collect();
+    }
+    (dj_dw, dj_db)
+}
+
+#[pyfunction]
+fn gradient_descent_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64, alpha: f64, num_iters: u64) -> PyResult<Lrobj_multi> {
+    let mut j_hist : Vec<f64> = vec![];
+    let mut mod_w : Vec<f64> = vec![];
+    let mut mod_b : f64 = 0.0;
+    for i in 0..num_iters {
+        let (dj_dw, dj_db) : (Vec<f64>, f64) = compute_gradient_multi(x.clone(), y.clone(), w.clone(), b);
+        for (ai, bi) in w.iter().zip(dj_dw.iter()) {
+            mod_w.push(ai - alpha * bi);
+        }
+        mod_b = b - alpha * dj_db;
+
+        if i < 100000 {
+            j_hist.push(compute_cost_multi(x.clone(), y.clone(), w.clone(), b));
+        }
+
+        if i % (num_iters / 10) == 0 {
+            let j_hist_last = j_hist[j_hist.len() - 1];
+            println!("Iteration {i}:  Cost: {j_hist_last}");
+        }
+    }
+    Ok(Lrobj_multi::new(mod_w, mod_b, j_hist))
 }
 
 /// Formats the sum of two numbers as string.
@@ -99,6 +169,7 @@ fn vinhal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_gradient, m)?)?;
     m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
     m.add_function(wrap_pyfunction!(predict_single_value, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_cost_multi, m)?)?;
 //    m.add_function(wrap_pyfunction!(gradient_descent, m)?)?;
     Ok(())
 }
