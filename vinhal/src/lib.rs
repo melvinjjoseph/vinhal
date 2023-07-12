@@ -120,16 +120,13 @@ fn compute_cost_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64) -> f64
 fn compute_gradient_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64) -> (Vec<f64>, f64) {
     let mut dj_dw : Vec<f64> = vec![0.0; x[0].len()];
     let mut dj_db : f64 = 0.0;
-    // let mut dj_dw_tmp: f64=0.0;
     let m = x.len() as f64;
     for (ai, bi) in x.iter().zip(y.iter()) {
         let err = predict_single_value(ai.to_vec(), w.clone(), b) - bi;
-        // dj_dw_tmp=0.0;
         for i in 0..x[0].len() {
             dj_dw[i]+=err*ai[i];
             dj_db += err;
         }
-        // dj_dw.push(dj_dw_tmp);
     }
     dj_dw = dj_dw.iter().map(|&x| x / m).collect();
     dj_db/=m;
