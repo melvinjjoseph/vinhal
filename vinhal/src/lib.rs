@@ -157,6 +157,56 @@ fn gradient_descent_multi(x: Vec<Vec<f64>>, y: Vec<f64>, w: Vec<f64>, b: f64, al
     Ok(Lrobj_multi::new(mod_w, mod_b, j_hist))
 }
 
+#[pyfunction]
+fn predict_single_value_poly(x: f64, w: Vec<f64>, b: f64) -> f64 {
+    w.iter().zip(0..w.len()).fold(b, |acc, (&wi, ii)| acc + wi * x.powi(ii as i32))
+}
+
+#[pyfunction]
+fn compute_cost_poly(x: Vec<f64>, y: Vec<f64>, w: Vec<f64>, b: f64) -> f64 {
+    let mut cost : f64 = 0.0;
+    for i in 0..x.len() {
+        cost += (predict_single_value_poly(x[i], w.clone(), b) - y[i]).powi(2);
+    }
+    cost / (2.0 * x.len() as f64)
+}
+
+#[pyfunction]
+fn compute_gradient_poly(x: Vec<f64>, y: Vec<f64>, w: Vec<f64>, b: f64) -> (Vec<f64>, f64) {
+    let mut dj_dw : Vec<f64> = vec![0.0 ; w.len()];
+    let mut dj_db : f64 = 0.0;
+    let m = x.len();
+    for i in 0..m {
+        let err = predict_single_value_poly(x[i], w.clone(), b) - y[i];
+        for j in 1..m {
+            dj_dw[j] += err * (x[i].powi(j as i32));
+            dj_db += err;
+        }
+    }
+    (dj_dw.iter().map(|&a| a / m as f64).collect(), dj_db / m as f64)
+}
+
+#[pyfunction]
+fn gradient_descent_poly(x: Vec<f64>, y: Vec<f64>, degree: usize, alpha: f64, num_iters: u64) -> PyResult<Lrobj_multi> {
+    let mut j_hist : Vec<f64> = vec![];
+    let mut w : Vec<f64> = vec![0.0 ; degree+1];
+    let mut b = 0.0;
+    for i in 0..num_iters {
+        let (dj_dw, dj_db) : (Vec<f64>, f64) = compute_gradient_poly(x.clone(), y.clone(), w.clone(), b);
+        w = w.iter().zip(dj_dw.iter()).map(|(&v1, &v2)| v1 - alpha * v2).collect();
+        b -= alpha * dj_db;
+
+        if i < 100000 {
+            j_hist.push(compute_cost_poly(x.clone(), y.clone(), w.clone(), b));
+        }
+        if i % (num_iters / 10) == 0 {
+            let j_hist_last = j_hist[j_hist.len() - 1];
+            println!("Iteration {i}: Cost : {j_hist_last}");
+        }
+    }
+    Ok(Lrobj_multi::new(w, b, j_hist))
+}
+
 /// Formats the sum of two numbers as string.
 // #[pyfunction]
 // fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
