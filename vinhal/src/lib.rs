@@ -176,9 +176,10 @@ fn compute_gradient_poly(x: Vec<f64>, y: Vec<f64>, w: Vec<f64>, b: f64) -> (Vec<
     let mut dj_dw : Vec<f64> = vec![0.0 ; w.len()];
     let mut dj_db : f64 = 0.0;
     let m = x.len();
+    let n = w.len();
     for i in 0..m {
         let err = predict_single_value_poly(x[i], w.clone(), b) - y[i];
-        for j in 1..m {
+        for j in 1..n {
             dj_dw[j] += err * (x[i].powi(j as i32));
             dj_db += err;
         }
@@ -223,5 +224,9 @@ fn vinhal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_cost_multi, m)?)?;
     m.add_function(wrap_pyfunction!(compute_gradient_multi, m)?)?;
     m.add_function(wrap_pyfunction!(gradient_descent_multi, m)?)?;
+    m.add_function(wrap_pyfunction!(predict_single_value_poly, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_cost_poly, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_gradient_poly, m)?)?;
+    m.add_function(wrap_pyfunction!(gradient_descent_poly, m)?)?;
     Ok(())
 }
